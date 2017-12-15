@@ -1,0 +1,401 @@
+<html>
+
+<head>
+<style type="text/css">
+.knitr .inline {
+  background-color: #f7f7f7;
+  border:solid 1px #B0B0B0;
+}
+.error {
+	font-weight: bold;
+	color: #FF0000;
+}
+.warning {
+	font-weight: bold;
+}
+.message {
+	font-style: italic;
+}
+.source, .output, .warning, .error, .message {
+	padding: 0 1em;
+  border:solid 1px #F7F7F7;
+}
+.source {
+  background-color: #f5f5f5;
+}
+.rimage .left {
+  text-align: left;
+}
+.rimage .right {
+  text-align: right;
+}
+.rimage .center {
+  text-align: center;
+}
+.hl.num {
+  color: #AF0F91;
+}
+.hl.str {
+  color: #317ECC;
+}
+.hl.com {
+  color: #AD95AF;
+  font-style: italic;
+}
+.hl.opt {
+  color: #000000;
+}
+.hl.std {
+  color: #585858;
+}
+.hl.kwa {
+  color: #295F94;
+  font-weight: bold;
+}
+.hl.kwb {
+  color: #B05A65;
+}
+.hl.kwc {
+  color: #55aa55;
+}
+.hl.kwd {
+  color: #BC5A65;
+  font-weight: bold;
+}
+</style>
+<title>Title</title>
+</head>
+
+<body>
+
+<p> The other night I attended an <a href="https://www.meetup.com/rladies-chicago/" id="r-ladies_chiago_out" target="_blank">R-Ladies</a> meetup where Kaylene McClanahan <a href="https://twitter.com/RLadiesChicago/status/941532162741878784" id="twitter_rladies_kaylene_out" target="_blank">presented a brief into to R Markdown</a> and set-up a mini-hackathon-style coding session with NYC noise complaint data she prepared. The group I was in was working on mapping, although we didn't have enough time to do everything we wanted, so below I demonstrate how density data can be calculated and used in combination with <code>ggmap()</code> to produce interesting and useful visualizations.</p>
+
+<h2> GitHub Source </h2>
+
+<p> <b>Note:</b> Code can be found on <a href="https://github.com/mcandocia/puma/blob/master/" id="github_puma_out" target="_blank">GitHub</a> for the project (includuing the .Rhtml file used to make this article), and the specific density weighting code can be found <a href="https://github.com/mcandocia/puma/blob/master/weighted_map_raster.r" id="github_puma_weightedmapraster_out" target="_blank">here</a>.</p>
+
+<h2> Setup </h2> 
+
+<p>First, let's load the data and calculate the response time from the <code>created date </code> and <code> closed date </code> variables. Additionally, let's also filter out points with negative response time, response time over 50 hours (unrealistic), and anything with missing coordinates. I will be using base R for all of the (limited) data cleaning required here.</p>
+
+<div class="chunk" id="unnamed-chunk-1"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl kwd">library</span><span class="hl std">(ggplot2)</span>
+<span class="hl kwd">library</span><span class="hl std">(ggmap)</span>
+<span class="hl com">#this library produces color palettes that are easier to discern</span>
+<span class="hl kwd">library</span><span class="hl std">(cetcolor)</span>
+<span class="hl kwd">source</span><span class="hl std">(</span><span class="hl str">'weighted_map_raster.r'</span><span class="hl std">)</span>
+<span class="hl std">party_ready</span> <span class="hl kwb">=</span> <span class="hl kwd">read.csv</span><span class="hl std">(</span><span class="hl str">'data/party_ready.csv'</span><span class="hl std">)</span>
+<span class="hl std">party_sideways</span> <span class="hl kwb">=</span> <span class="hl kwd">read.csv</span><span class="hl std">(</span><span class="hl str">'data/party_sideways.csv'</span><span class="hl std">)</span>
+<span class="hl std">party_ready</span><span class="hl opt">$</span><span class="hl std">duration</span> <span class="hl kwb">=</span> <span class="hl kwd">as.numeric</span><span class="hl std">(</span><span class="hl kwd">as.POSIXct</span><span class="hl std">(party_ready</span><span class="hl opt">$</span><span class="hl std">closed_date)</span> <span class="hl opt">-</span>
+                                    <span class="hl kwd">as.POSIXct</span><span class="hl std">(party_ready</span><span class="hl opt">$</span><span class="hl std">created_date))</span>
+<span class="hl std">party_ready_realistic</span> <span class="hl kwb">=</span> <span class="hl kwd">with</span><span class="hl std">(party_ready, party_ready[duration</span> <span class="hl opt">&gt;</span> <span class="hl num">0</span> <span class="hl opt">&amp;</span>
+                                                        <span class="hl std">duration</span> <span class="hl opt">&lt;</span> <span class="hl num">3000</span> <span class="hl opt">&amp;</span>
+                                                        <span class="hl opt">!</span><span class="hl kwd">is.na</span><span class="hl std">(longitude),])</span>
+</pre></div>
+</div></div>
+
+<p> Above I loaded some code I wrote to calculate density values for a map of new york. Below, I will use them as a rasterized overlay of a map using <code>geom_raster()</code>, which is much, much faster (~100 times) than using <code>geom_tile()</code> if it is possible to use it. Note that you must use <code>coord_cartesian()</code> after <code>ggmap()</code>, since rasterized graphics don't work with non-cartesian projections.</p>
+
+<div class="chunk" id="unnamed-chunk-2"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">default_density</span> <span class="hl kwb">=</span> <span class="hl kwd">createWeightedGrid</span><span class="hl std">(party_ready_realistic)</span>
+<span class="hl std">weighted_density</span> <span class="hl kwb">=</span> <span class="hl kwd">createWeightedGrid</span><span class="hl std">(party_ready_realistic,</span> <span class="hl kwc">variable</span><span class="hl std">=</span><span class="hl str">'duration'</span><span class="hl std">)</span>
+<span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">normalized</span> <span class="hl kwb">=</span> <span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">weight</span><span class="hl opt">/</span><span class="hl std">(</span><span class="hl num">1e-10</span> <span class="hl opt">+</span> <span class="hl std">default_density</span><span class="hl opt">$</span><span class="hl std">weight)</span>
+<span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">default_density</span> <span class="hl kwb">=</span> <span class="hl std">default_density</span><span class="hl opt">$</span><span class="hl std">weight</span>
+</pre></div>
+</div></div>
+
+<p> The resulting data frames look like this: </p>
+
+<div class="source"><pre class="knitr r"><span class="hl kwd">cat</span><span class="hl std">(</span><span class="hl kwd">kable</span><span class="hl std">(</span><span class="hl kwd">head</span><span class="hl std">(default_density)))</span>
+</pre></div>
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:right;"> lat_index </th>
+   <th style="text-align:right;"> lon_index </th>
+   <th style="text-align:right;"> longitude </th>
+   <th style="text-align:right;"> latitude </th>
+   <th style="text-align:right;"> weight </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.49382 </td>
+   <td style="text-align:right;"> 0.0499707 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.49882 </td>
+   <td style="text-align:right;"> 0.2462530 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 3 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.50382 </td>
+   <td style="text-align:right;"> 3.6059958 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 4 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.50882 </td>
+   <td style="text-align:right;"> 3.6156295 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 5 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.51382 </td>
+   <td style="text-align:right;"> 3.5692839 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 6 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.51882 </td>
+   <td style="text-align:right;"> 3.5667252 </td>
+  </tr>
+</tbody>
+</table><div class="source"><pre class="knitr r"><span class="hl kwd">cat</span><span class="hl std">(</span><span class="hl kwd">kable</span><span class="hl std">(</span><span class="hl kwd">head</span><span class="hl std">(weighted_density)))</span>
+</pre></div>
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:right;"> lat_index </th>
+   <th style="text-align:right;"> lon_index </th>
+   <th style="text-align:right;"> longitude </th>
+   <th style="text-align:right;"> latitude </th>
+   <th style="text-align:right;"> weight </th>
+   <th style="text-align:right;"> normalized </th>
+   <th style="text-align:right;"> default_density </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.49382 </td>
+   <td style="text-align:right;"> 9.244575 </td>
+   <td style="text-align:right;"> 185.0000 </td>
+   <td style="text-align:right;"> 0.0499707 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 2 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.49882 </td>
+   <td style="text-align:right;"> 40.661230 </td>
+   <td style="text-align:right;"> 165.1198 </td>
+   <td style="text-align:right;"> 0.2462530 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 3 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.50382 </td>
+   <td style="text-align:right;"> 383.735338 </td>
+   <td style="text-align:right;"> 106.4159 </td>
+   <td style="text-align:right;"> 3.6059958 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 4 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.50882 </td>
+   <td style="text-align:right;"> 384.725184 </td>
+   <td style="text-align:right;"> 106.4061 </td>
+   <td style="text-align:right;"> 3.6156295 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 5 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.51382 </td>
+   <td style="text-align:right;"> 375.847734 </td>
+   <td style="text-align:right;"> 105.3006 </td>
+   <td style="text-align:right;"> 3.5692839 </td>
+  </tr>
+  <tr>
+   <td style="text-align:right;"> 6 </td>
+   <td style="text-align:right;"> 1 </td>
+   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> 40.51882 </td>
+   <td style="text-align:right;"> 375.561314 </td>
+   <td style="text-align:right;"> 105.2958 </td>
+   <td style="text-align:right;"> 3.5667252 </td>
+  </tr>
+</tbody>
+</table>
+
+<p> We will also load a map of New York City, along with defining a labeler for log-scaled legends and a constant. </p>
+
+<div class="chunk" id="unnamed-chunk-4"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">nyc</span> <span class="hl kwb">&lt;-</span> <span class="hl kwd">get_map</span><span class="hl std">(</span><span class="hl str">'new york city, new york'</span><span class="hl std">,</span> <span class="hl kwc">maptype</span><span class="hl std">=</span><span class="hl str">'toner'</span><span class="hl std">,</span> <span class="hl kwc">source</span><span class="hl std">=</span><span class="hl str">'stamen'</span><span class="hl std">,</span> <span class="hl kwc">zoom</span><span class="hl std">=</span><span class="hl num">11</span><span class="hl std">)</span>
+
+<span class="hl std">antilog_formatter</span> <span class="hl kwb">=</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">x</span><span class="hl std">){</span>
+  <span class="hl kwd">round</span><span class="hl std">(</span><span class="hl kwd">exp</span><span class="hl std">(x))</span>
+<span class="hl std">}</span>
+<span class="hl std">r5</span> <span class="hl kwb">=</span> <span class="hl kwd">sqrt</span><span class="hl std">(</span><span class="hl num">5</span><span class="hl std">)</span>
+</pre></div>
+</div></div>
+
+<p> Below is a graph of the density of noise complaints within New York City. </p>
+
+<div class="chunk" id="unnamed-chunk-5"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl kwd">ggmap</span><span class="hl std">(nyc)</span> <span class="hl opt">+</span> <span class="hl kwd">coord_cartesian</span><span class="hl std">()</span> <span class="hl opt">+</span>
+  <span class="hl kwd">geom_raster</span><span class="hl std">(</span><span class="hl kwc">data</span><span class="hl std">=weighted_density[weighted_density</span><span class="hl opt">$</span><span class="hl std">normalized</span> <span class="hl opt">&gt;</span> <span class="hl kwd">exp</span><span class="hl std">(</span><span class="hl num">0.101</span><span class="hl std">),],</span>
+              <span class="hl kwd">aes</span><span class="hl std">(</span><span class="hl kwc">x</span><span class="hl std">=longitude,</span> <span class="hl kwc">y</span><span class="hl std">=latitude,</span>
+                  <span class="hl kwc">fill</span><span class="hl std">=</span><span class="hl kwd">log</span><span class="hl std">( default_density),</span>
+                  <span class="hl kwc">alpha</span><span class="hl std">=</span><span class="hl kwd">log</span><span class="hl std">(default_density)))</span> <span class="hl opt">+</span>
+  <span class="hl kwd">scale_alpha_continuous</span><span class="hl std">()</span> <span class="hl opt">+</span>
+  <span class="hl kwd">scale_fill_gradientn</span><span class="hl std">(</span><span class="hl str">'Density of Complaints'</span><span class="hl std">,</span>
+                       <span class="hl kwc">colors</span><span class="hl std">=</span><span class="hl kwd">cet_pal</span><span class="hl std">(</span><span class="hl num">5</span><span class="hl std">),</span> <span class="hl kwc">label</span><span class="hl std">=antilog_formatter,</span>
+                       <span class="hl kwc">breaks</span> <span class="hl std">=</span> <span class="hl kwd">log</span><span class="hl std">(</span><span class="hl kwd">c</span><span class="hl std">(</span><span class="hl num">1</span><span class="hl opt">/</span><span class="hl std">r5,</span> <span class="hl num">1</span><span class="hl std">,r5,</span> <span class="hl num">4</span><span class="hl std">,</span> <span class="hl num">4</span><span class="hl opt">*</span><span class="hl std">r5,</span> <span class="hl num">20</span><span class="hl std">,</span> <span class="hl num">20</span><span class="hl opt">*</span><span class="hl std">r5,</span> <span class="hl num">100</span><span class="hl std">,</span> <span class="hl num">100</span><span class="hl opt">*</span><span class="hl std">r5 )))</span> <span class="hl opt">+</span>
+  <span class="hl kwd">ggtitle</span><span class="hl std">(</span><span class="hl str">'Density of Noise Complaints in NYC (per year)'</span><span class="hl std">)</span> <span class="hl opt">+</span>
+  <span class="hl kwd">guides</span><span class="hl std">(</span><span class="hl kwc">alpha</span><span class="hl std">=</span><span class="hl str">'none'</span><span class="hl std">)</span>
+</pre></div>
+<div class="warning"><pre class="knitr r">## Warning: Removed 2857 rows containing missing values (geom_raster).
+</pre></div>
+</div><div class="rimage default"><img src="figure/unnamed-chunk-5-1.png" title="plot of chunk unnamed-chunk-5" alt="plot of chunk unnamed-chunk-5" class="plot" /></div></div>
+
+<p> Below is an (accurate) estimate of the average wait time for complaints. It seems that the northernmost region has an unusually high wait time.</p>
+
+<div class="chunk" id="unnamed-chunk-6"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl kwd">ggmap</span><span class="hl std">(nyc)</span> <span class="hl opt">+</span> <span class="hl kwd">coord_cartesian</span><span class="hl std">()</span> <span class="hl opt">+</span>
+  <span class="hl kwd">geom_raster</span><span class="hl std">(</span><span class="hl kwc">data</span><span class="hl std">=weighted_density[weighted_density</span><span class="hl opt">$</span><span class="hl std">normalized</span> <span class="hl opt">&gt;</span> <span class="hl kwd">exp</span><span class="hl std">(</span><span class="hl num">0.101</span><span class="hl std">),],</span>
+              <span class="hl kwd">aes</span><span class="hl std">(</span><span class="hl kwc">x</span><span class="hl std">=longitude,</span> <span class="hl kwc">y</span><span class="hl std">=latitude,</span>
+                  <span class="hl kwc">fill</span><span class="hl std">=</span><span class="hl kwd">log</span><span class="hl std">( normalized),</span>
+                  <span class="hl kwc">alpha</span><span class="hl std">=</span><span class="hl kwd">log</span><span class="hl std">(normalized)))</span> <span class="hl opt">+</span>
+  <span class="hl kwd">scale_alpha_continuous</span><span class="hl std">()</span> <span class="hl opt">+</span>
+  <span class="hl kwd">scale_fill_gradientn</span><span class="hl std">(</span><span class="hl str">'Average Response Time (minutes)'</span><span class="hl std">,</span>
+                       <span class="hl kwc">colors</span><span class="hl std">=</span><span class="hl kwd">cet_pal</span><span class="hl std">(</span><span class="hl num">5</span><span class="hl std">),</span> <span class="hl kwc">label</span><span class="hl std">=antilog_formatter)</span> <span class="hl opt">+</span>
+  <span class="hl kwd">ggtitle</span><span class="hl std">(</span><span class="hl str">'Average Response Time to Noise Complaints in NYC'</span><span class="hl std">)</span> <span class="hl opt">+</span>
+  <span class="hl kwd">guides</span><span class="hl std">(</span><span class="hl kwc">alpha</span><span class="hl std">=</span><span class="hl str">'none'</span><span class="hl std">)</span>
+</pre></div>
+<div class="warning"><pre class="knitr r">## Warning: Removed 2857 rows containing missing values (geom_raster).
+</pre></div>
+</div><div class="rimage default"><img src="figure/unnamed-chunk-6-1.png" title="plot of chunk unnamed-chunk-6" alt="plot of chunk unnamed-chunk-6" class="plot" /></div></div>
+
+<h2 id="kernel_density_code"> Additional Code </h2>
+
+<p> This is the code that I used to generate the density maps. It is about 2.5 times slower than the <code> kde2d() </code> from the <code> MASS </code> package, but its behavior is more explicit, and it can (most importantly) be used to calculate weighted averages. There is also a function <code> kde2d.weighted</code> from the <code> ggtern </code> package, but it has a small bug in it and I haven't figured out how to get the results to interpret properly. The code below is about 3-4 times slower, but it works well. </p>
+
+<div class="chunk" id="unnamed-chunk-7"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">getMatrixElementsByLinearIndex</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">mat</span><span class="hl std">,</span> <span class="hl kwc">row_idx</span><span class="hl std">,</span> <span class="hl kwc">col_idx</span><span class="hl std">){</span>
+  <span class="hl std">nr</span> <span class="hl kwb">=</span> <span class="hl kwd">nrow</span><span class="hl std">(mat)</span>
+  <span class="hl kwd">return</span><span class="hl std">(mat[row_idx</span> <span class="hl opt">+</span> <span class="hl std">nr</span><span class="hl opt">*</span><span class="hl std">(col_idx</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">)])</span>
+<span class="hl std">}</span>
+
+<span class="hl com">## Function creates a kernel density grid, either based on density of points (default) </span>
+<span class="hl com">##          or a weighted density</span>
+<span class="hl com"># variable - character of a variable that is used to weight the density</span>
+<span class="hl com"># kernel_lat_sd - the standard deviation/bandwidth of the kernel in latitude units; default </span>
+<span class="hl com">#                 is approximately 1 mile</span>
+<span class="hl com"># tile_latitude_size - the length of each tile's latitude dimension; longitude will scale </span>
+<span class="hl com">#                      with this to be roughly square</span>
+<span class="hl com"># max_influence_sd - the maximum number of standard deviations in either axis that a point</span>
+<span class="hl com">#                    can create influence</span>
+<span class="hl com"># padding_lat - the amount of latitude added in each direction where the density will still</span>
+<span class="hl com">#               be calculated; padding for longitude is calculated from this</span>
+<span class="hl com"># normalize_weights - if TRUE, then the kernel density will be normalized over each affected </span>
+<span class="hl com">#                     region for each data point</span>
+<span class="hl std">createWeightedGrid</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">data</span><span class="hl std">,</span> <span class="hl kwc">variable</span><span class="hl std">=</span><span class="hl kwa">NULL</span><span class="hl std">,</span> <span class="hl kwc">kernel_lat_sd</span><span class="hl std">=</span><span class="hl num">1</span><span class="hl opt">/</span><span class="hl num">69</span><span class="hl std">,</span> <span class="hl kwc">tile_latitude_size</span><span class="hl std">=</span><span class="hl num">0.005</span><span class="hl std">,</span>
+                               <span class="hl kwc">max_influence_sd</span> <span class="hl std">=</span> <span class="hl num">2</span><span class="hl std">,</span> <span class="hl kwc">padding_lat</span><span class="hl std">=</span><span class="hl num">0.005</span><span class="hl std">,</span> <span class="hl kwc">normalize_weights</span><span class="hl std">=</span><span class="hl num">TRUE</span><span class="hl std">){</span>
+  <span class="hl std">data</span> <span class="hl kwb">=</span> <span class="hl std">data[(</span><span class="hl opt">!</span><span class="hl kwd">is.na</span><span class="hl std">(data</span><span class="hl opt">$</span><span class="hl std">longitude))</span> <span class="hl opt">&amp; !</span><span class="hl kwd">is.na</span><span class="hl std">(data</span><span class="hl opt">$</span><span class="hl std">latitude),]</span>
+  <span class="hl kwa">if</span> <span class="hl std">(</span><span class="hl opt">!</span><span class="hl kwd">is.null</span><span class="hl std">(variable)){</span>
+    <span class="hl std">data</span> <span class="hl kwb">=</span> <span class="hl std">data[</span><span class="hl opt">!</span><span class="hl kwd">is.na</span><span class="hl std">(data[,variable]),]</span>
+  <span class="hl std">}</span>
+  <span class="hl std">longitude</span> <span class="hl kwb">=</span> <span class="hl std">data</span><span class="hl opt">$</span><span class="hl std">longitude</span>
+  <span class="hl std">latitude</span> <span class="hl kwb">=</span> <span class="hl std">data</span><span class="hl opt">$</span><span class="hl std">latitude</span>
+  <span class="hl std">med_lon</span> <span class="hl kwb">=</span> <span class="hl kwd">mean</span><span class="hl std">(</span><span class="hl kwd">range</span><span class="hl std">(longitude))</span>
+  <span class="hl std">med_lat</span> <span class="hl kwb">=</span> <span class="hl kwd">mean</span><span class="hl std">(</span><span class="hl kwd">range</span><span class="hl std">(latitude))</span>
+  <span class="hl std">lon_scale_factor</span> <span class="hl kwb">=</span> <span class="hl kwd">cos</span><span class="hl std">(med_lon</span> <span class="hl opt">*</span> <span class="hl std">pi</span><span class="hl opt">/</span><span class="hl num">180</span><span class="hl std">)</span>
+  <span class="hl std">padding_lon</span> <span class="hl kwb">=</span> <span class="hl std">lon_scale_factor</span> <span class="hl opt">*</span> <span class="hl std">padding_lat</span>
+  <span class="hl std">range_lon</span> <span class="hl kwb">=</span> <span class="hl kwd">range</span><span class="hl std">(longitude,</span> <span class="hl kwc">na.rm</span><span class="hl std">=</span><span class="hl num">TRUE</span><span class="hl std">)</span> <span class="hl opt">+</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">,</span> <span class="hl num">1</span><span class="hl std">)</span> <span class="hl opt">*</span> <span class="hl std">padding_lon</span>
+  <span class="hl std">range_lat</span> <span class="hl kwb">=</span> <span class="hl kwd">range</span><span class="hl std">(latitude,</span> <span class="hl kwc">na.rm</span><span class="hl std">=</span><span class="hl num">TRUE</span><span class="hl std">)</span> <span class="hl opt">+</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">,</span> <span class="hl num">1</span><span class="hl std">)</span> <span class="hl opt">*</span> <span class="hl std">padding_lat</span>
+
+
+  <span class="hl std">tile_longitude_size</span> <span class="hl kwb">=</span> <span class="hl std">tile_latitude_size</span> <span class="hl opt">*</span> <span class="hl std">lon_scale_factor</span>
+  <span class="hl std">padding_lon</span> <span class="hl kwb">=</span> <span class="hl std">lon_scale_factor</span> <span class="hl opt">*</span> <span class="hl std">padding_lat</span>
+
+  <span class="hl std">lat_tile_values</span> <span class="hl kwb">=</span> <span class="hl kwd">seq</span><span class="hl std">(range_lat[</span><span class="hl num">1</span><span class="hl std">], range_lat[</span><span class="hl num">2</span><span class="hl std">], tile_latitude_size)</span>
+  <span class="hl std">lon_tile_values</span> <span class="hl kwb">=</span> <span class="hl kwd">seq</span><span class="hl std">(range_lon[</span><span class="hl num">1</span><span class="hl std">], range_lon[</span><span class="hl num">2</span><span class="hl std">], tile_longitude_size)</span>
+
+  <span class="hl std">n_lat_tiles</span> <span class="hl kwb">=</span> <span class="hl kwd">length</span><span class="hl std">(lat_tile_values)</span>
+  <span class="hl std">n_lon_tiles</span> <span class="hl kwb">=</span> <span class="hl kwd">length</span><span class="hl std">(lon_tile_values)</span>
+
+  <span class="hl std">weight_matrix</span> <span class="hl kwb">=</span> <span class="hl kwd">matrix</span><span class="hl std">(</span><span class="hl num">0</span><span class="hl std">,</span> <span class="hl kwc">ncol</span><span class="hl std">=n_lon_tiles,</span> <span class="hl kwc">nrow</span><span class="hl std">=n_lat_tiles)</span>
+
+  <span class="hl std">lat_to_index</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">latitude</span><span class="hl std">){</span>
+    <span class="hl kwd">round</span><span class="hl std">(n_lat_tiles</span> <span class="hl opt">*</span> <span class="hl std">(latitude</span> <span class="hl opt">-</span> <span class="hl std">range_lat[</span><span class="hl num">1</span><span class="hl std">])</span><span class="hl opt">/</span><span class="hl kwd">diff</span><span class="hl std">(range_lat))</span> <span class="hl opt">+</span> <span class="hl num">1</span>
+  <span class="hl std">}</span>
+
+  <span class="hl std">lon_to_index</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">longitude</span><span class="hl std">){</span>
+    <span class="hl kwd">round</span><span class="hl std">(n_lon_tiles</span> <span class="hl opt">*</span> <span class="hl std">(longitude</span> <span class="hl opt">-</span> <span class="hl std">range_lon[</span><span class="hl num">1</span><span class="hl std">])</span><span class="hl opt">/</span><span class="hl kwd">diff</span><span class="hl std">(range_lon))</span>
+  <span class="hl std">}</span>
+
+  <span class="hl std">lat_index_radius</span> <span class="hl kwb">=</span> <span class="hl kwd">round</span><span class="hl std">(n_lat_tiles</span> <span class="hl opt">*</span> <span class="hl std">max_influence_sd</span> <span class="hl opt">*</span> <span class="hl std">tile_latitude_size</span><span class="hl opt">/</span><span class="hl kwd">diff</span><span class="hl std">(range_lat))</span>
+  <span class="hl std">lon_index_radius</span> <span class="hl kwb">=</span> <span class="hl kwd">round</span><span class="hl std">(n_lon_tiles</span> <span class="hl opt">*</span> <span class="hl std">max_influence_sd</span> <span class="hl opt">*</span> <span class="hl std">tile_longitude_size</span><span class="hl opt">/</span><span class="hl kwd">diff</span><span class="hl std">(range_lon))</span>
+
+  <span class="hl std">calculate_latitude_bounds</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">latitude</span><span class="hl std">){</span>
+    <span class="hl std">lat_index</span> <span class="hl kwb">=</span> <span class="hl kwd">lat_to_index</span><span class="hl std">(latitude)</span>
+    <span class="hl std">bounds</span> <span class="hl kwb">=</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl kwd">pmax</span><span class="hl std">(lat_index</span> <span class="hl opt">-</span> <span class="hl std">lat_index_radius,</span> <span class="hl num">1</span><span class="hl std">),</span>
+               <span class="hl kwd">pmin</span><span class="hl std">(lat_index</span><span class="hl opt">+</span><span class="hl std">lat_index_radius, n_lat_tiles))</span>
+    <span class="hl kwd">return</span><span class="hl std">(bounds[</span><span class="hl num">1</span><span class="hl std">]</span><span class="hl opt">:</span><span class="hl std">bounds[</span><span class="hl num">2</span><span class="hl std">])</span>
+  <span class="hl std">}</span>
+
+  <span class="hl std">calculate_longitude_bounds</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">longitude</span><span class="hl std">){</span>
+    <span class="hl std">lon_index</span> <span class="hl kwb">=</span> <span class="hl kwd">lon_to_index</span><span class="hl std">(longitude)</span>
+    <span class="hl std">bounds</span> <span class="hl kwb">=</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl kwd">pmax</span><span class="hl std">(lon_index</span> <span class="hl opt">-</span> <span class="hl std">lon_index_radius,</span> <span class="hl num">1</span><span class="hl std">),</span>
+               <span class="hl kwd">pmin</span><span class="hl std">(lon_index</span><span class="hl opt">+</span><span class="hl std">lon_index_radius, n_lon_tiles))</span>
+    <span class="hl kwd">return</span><span class="hl std">(bounds[</span><span class="hl num">1</span><span class="hl std">]</span><span class="hl opt">:</span><span class="hl std">bounds[</span><span class="hl num">2</span><span class="hl std">])</span>
+  <span class="hl std">}</span>
+
+  <span class="hl kwa">if</span> <span class="hl std">(</span><span class="hl opt">!</span><span class="hl kwd">is.null</span><span class="hl std">(variable)){</span>
+    <span class="hl std">x</span> <span class="hl kwb">=</span> <span class="hl std">data[,variable]</span>
+  <span class="hl std">}</span>
+  <span class="hl kwa">else</span><span class="hl std">{</span>
+    <span class="hl std">x</span> <span class="hl kwb">=</span> <span class="hl kwd">rep</span><span class="hl std">(</span><span class="hl num">1</span><span class="hl std">,</span> <span class="hl kwd">nrow</span><span class="hl std">(data))</span>
+  <span class="hl std">}</span>
+
+  <span class="hl std">calculate_distance</span> <span class="hl kwb">&lt;-</span> <span class="hl kwa">function</span><span class="hl std">(</span><span class="hl kwc">latitude</span><span class="hl std">,</span> <span class="hl kwc">longitude</span><span class="hl std">,</span> <span class="hl kwc">grid</span><span class="hl std">){</span>
+    <span class="hl kwd">sqrt</span><span class="hl std">(((grid</span><span class="hl opt">$</span><span class="hl std">longitude</span><span class="hl opt">-</span><span class="hl std">longitude)</span><span class="hl opt">*</span><span class="hl std">lon_scale_factor)</span><span class="hl opt">^</span><span class="hl num">2</span> <span class="hl opt">+</span>
+           <span class="hl std">(grid</span><span class="hl opt">$</span><span class="hl std">latitude</span><span class="hl opt">-</span><span class="hl std">latitude)</span><span class="hl opt">^</span><span class="hl num">2</span><span class="hl std">)</span>
+  <span class="hl std">}</span>
+  <span class="hl kwa">for</span> <span class="hl std">(i</span> <span class="hl kwa">in</span> <span class="hl num">1</span><span class="hl opt">:</span><span class="hl kwd">nrow</span><span class="hl std">(data)){</span>
+    <span class="hl std">x_latitude</span> <span class="hl kwb">=</span> <span class="hl std">latitude[i]</span>
+    <span class="hl std">x_longitude</span> <span class="hl kwb">=</span> <span class="hl std">longitude[i]</span>
+    <span class="hl std">valid_lat_indexes</span> <span class="hl kwb">=</span> <span class="hl kwd">calculate_latitude_bounds</span><span class="hl std">(x_latitude)</span>
+    <span class="hl std">valid_lon_indexes</span> <span class="hl kwb">=</span> <span class="hl kwd">calculate_longitude_bounds</span><span class="hl std">(x_longitude)</span>
+    <span class="hl std">latlon_grid</span> <span class="hl kwb">=</span> <span class="hl kwd">expand.grid</span><span class="hl std">(</span><span class="hl kwc">lat_index</span> <span class="hl std">= valid_lat_indexes,</span>
+                              <span class="hl kwc">lon_index</span> <span class="hl std">= valid_lon_indexes)</span>
+    <span class="hl std">latlon_grid</span><span class="hl opt">$</span><span class="hl std">latitude</span> <span class="hl kwb">=</span> <span class="hl std">lat_tile_values[latlon_grid</span><span class="hl opt">$</span><span class="hl std">lat_index]</span>
+    <span class="hl std">latlon_grid</span><span class="hl opt">$</span><span class="hl std">longitude</span> <span class="hl kwb">=</span> <span class="hl std">lon_tile_values[latlon_grid</span><span class="hl opt">$</span><span class="hl std">lon_index]</span>
+
+    <span class="hl std">new_weights</span> <span class="hl kwb">=</span> <span class="hl num">1</span><span class="hl opt">/</span><span class="hl std">(pi</span><span class="hl opt">*</span><span class="hl std">kernel_lat_sd)</span> <span class="hl opt">*</span> <span class="hl kwd">exp</span><span class="hl std">(</span><span class="hl opt">-</span><span class="hl std">((</span><span class="hl kwd">calculate_distance</span><span class="hl std">(x_latitude,</span>
+                                                     <span class="hl std">x_longitude,</span>
+                                                     <span class="hl std">latlon_grid)))</span><span class="hl opt">^</span><span class="hl num">2</span><span class="hl opt">/</span>
+                                               <span class="hl std">(</span><span class="hl num">2</span><span class="hl opt">*</span><span class="hl std">kernel_lat_sd))</span>
+    <span class="hl kwa">if</span> <span class="hl std">(normalize_weights){</span>
+      <span class="hl std">new_weights</span> <span class="hl kwb">=</span> <span class="hl std">new_weights</span><span class="hl opt">/</span><span class="hl std">(</span><span class="hl kwd">sum</span><span class="hl std">(new_weights)</span> <span class="hl opt">+</span> <span class="hl num">1e-8</span><span class="hl std">)</span>
+    <span class="hl std">}</span>
+    <span class="hl std">weight_matrix[latlon_grid</span><span class="hl opt">$</span><span class="hl std">lat_index</span> <span class="hl opt">+</span>
+                    <span class="hl std">n_lat_tiles</span> <span class="hl opt">*</span> <span class="hl std">(latlon_grid</span><span class="hl opt">$</span><span class="hl std">lon_index</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">)]</span> <span class="hl kwb">=</span>
+      <span class="hl std">weight_matrix[latlon_grid</span><span class="hl opt">$</span><span class="hl std">lat_index</span> <span class="hl opt">+</span>
+                      <span class="hl std">n_lat_tiles</span> <span class="hl opt">*</span> <span class="hl std">(latlon_grid</span><span class="hl opt">$</span><span class="hl std">lon_index</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">)]</span> <span class="hl opt">+</span>
+      <span class="hl std">new_weights</span> <span class="hl opt">*</span> <span class="hl std">x[i]</span>
+  <span class="hl std">}</span>
+  <span class="hl std">final_grid</span> <span class="hl kwb">=</span> <span class="hl kwd">expand.grid</span><span class="hl std">(</span><span class="hl kwc">lat_index</span> <span class="hl std">=</span> <span class="hl num">1</span><span class="hl opt">:</span><span class="hl std">n_lat_tiles,</span> <span class="hl kwc">lon_index</span><span class="hl std">=</span><span class="hl num">1</span><span class="hl opt">:</span><span class="hl std">n_lon_tiles)</span>
+  <span class="hl std">final_grid</span><span class="hl opt">$</span><span class="hl std">longitude</span> <span class="hl kwb">=</span> <span class="hl std">lon_tile_values[final_grid</span><span class="hl opt">$</span><span class="hl std">lon_index]</span>
+  <span class="hl std">final_grid</span><span class="hl opt">$</span><span class="hl std">latitude</span> <span class="hl kwb">=</span> <span class="hl std">lat_tile_values[final_grid</span><span class="hl opt">$</span><span class="hl std">lat_index]</span>
+  <span class="hl std">final_grid</span><span class="hl opt">$</span><span class="hl std">weight</span> <span class="hl kwb">=</span> <span class="hl kwd">getMatrixElementsByLinearIndex</span><span class="hl std">(weight_matrix,</span>
+                                                     <span class="hl std">final_grid</span><span class="hl opt">$</span><span class="hl std">lat_index,</span>
+                                                     <span class="hl std">final_grid</span><span class="hl opt">$</span><span class="hl std">lon_index)</span>
+  <span class="hl kwd">return</span><span class="hl std">(final_grid)</span>
+<span class="hl std">}</span>
+</pre></div>
+</div></div>
+
+</body>
+</html>

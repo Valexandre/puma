@@ -1,0 +1,213 @@
+<html>
+
+<head>
+<title>Title</title>
+</head>
+
+<body>
+
+<p> The other night I attended an <a href="https://www.meetup.com/rladies-chicago/" id="r-ladies_chiago_out" target="_blank">R-Ladies</a> meetup where Kaylene McClanahan <a href="https://twitter.com/RLadiesChicago/status/941532162741878784" id="twitter_rladies_kaylene_out" target="_blank">presented a brief into to R Markdown</a> and set-up a mini-hackathon-style coding session with NYC noise complaint data she prepared. The group I was in was working on mapping, although we didn't have enough time to do everything we wanted, so below I demonstrate how density data can be calculated and used in combination with <code>ggmap()</code> to produce interesting and useful visualizations.</p>
+
+<h2> GitHub Source </h2>
+
+<p> <b>Note:</b> Code can be found on <a href="https://github.com/mcandocia/puma/blob/master/" id="github_puma_out" target="_blank">GitHub</a> for the project (includuing the .Rhtml file used to make this article), and the specific density weighting code can be found <a href="https://github.com/mcandocia/puma/blob/master/weighted_map_raster.r" id="github_puma_weightedmapraster_out" target="_blank">here</a>.</p>
+
+<h2> Setup </h2> 
+
+<p>First, let's load the data and calculate the response time from the <code>created date </code> and <code> closed date </code> variables. Additionally, let's also filter out points with negative response time, response time over 50 hours (unrealistic), and anything with missing coordinates. I will be using base R for all of the (limited) data cleaning required here.</p>
+
+<!--begin.rcode
+library(ggplot2)
+library(ggmap)
+#this library produces color palettes that are easier to discern
+library(cetcolor)
+source('weighted_map_raster.r')
+party_ready = read.csv('data/party_ready.csv')
+party_sideways = read.csv('data/party_sideways.csv')
+party_ready$duration = as.numeric(as.POSIXct(party_ready$closed_date) - 
+                                    as.POSIXct(party_ready$created_date))
+party_ready_realistic = with(party_ready, party_ready[duration > 0 & 
+                                                        duration < 3000 & 
+                                                        !is.na(longitude),])
+end.rcode-->
+
+<p> Above I loaded some code I wrote to calculate density values for a map of new york. Below, I will use them as a rasterized overlay of a map using <code>geom_raster()</code>, which is much, much faster (~100 times) than using <code>geom_tile()</code> if it is possible to use it. Note that you must use <code>coord_cartesian()</code> after <code>ggmap()</code>, since rasterized graphics don't work with non-cartesian projections.</p>
+
+<!--begin.rcode
+default_density = createWeightedGrid(party_ready_realistic)
+weighted_density = createWeightedGrid(party_ready_realistic, variable='duration')
+weighted_density$normalized = weighted_density$weight/(1e-10 + default_density$weight)
+weighted_density$default_density = default_density$weight
+
+end.rcode-->
+
+<p> The resulting data frames look like this: </p>
+
+<!--begin.rcode echo=TRUE, results='asis'
+cat(kable(head(default_density)))
+cat(kable(head(weighted_density)))
+end.rcode-->
+
+<p> We will also load a map of New York City, along with defining a labeler for log-scaled legends and a constant. </p>
+
+<!--begin.rcode message=FALSE, warning=FALSE
+nyc <- get_map('new york city, new york', maptype='toner', source='stamen', zoom=11)
+
+antilog_formatter = function(x){
+  round(exp(x))
+}
+r5 = sqrt(5)
+end.rcode-->
+
+<p> Below is a graph of the density of noise complaints within New York City. </p>
+
+<!--begin.rcode fig.width=8, fig.height=7
+ggmap(nyc) + coord_cartesian() + 
+  geom_raster(data=weighted_density[weighted_density$normalized > exp(0.101),], 
+              aes(x=longitude, y=latitude, 
+                  fill=log( default_density),
+                  alpha=log(default_density))) + 
+  scale_alpha_continuous() + 
+  scale_fill_gradientn('Density of Complaints', 
+                       colors=cet_pal(5), label=antilog_formatter, 
+                       breaks = log(c(1/r5, 1,r5, 4, 4*r5, 20, 20*r5, 100, 100*r5 ))) +
+  ggtitle('Density of Noise Complaints in NYC (per year)') +
+  guides(alpha='none')
+end.rcode-->
+
+<p> Below is an (accurate) estimate of the average wait time for complaints. It seems that the northernmost region has an unusually high wait time.</p>
+
+<!--begin.rcode fig.width=8, fig.height=7
+ggmap(nyc) + coord_cartesian() + 
+  geom_raster(data=weighted_density[weighted_density$normalized > exp(0.101),], 
+              aes(x=longitude, y=latitude, 
+                  fill=log( normalized),
+                  alpha=log(normalized))) + 
+  scale_alpha_continuous() + 
+  scale_fill_gradientn('Average Response Time (minutes)', 
+                       colors=cet_pal(5), label=antilog_formatter) +
+  ggtitle('Average Response Time to Noise Complaints in NYC') +
+  guides(alpha='none')
+end.rcode-->
+
+<h2 id="kernel_density_code"> Additional Code </h2>
+
+<p> This is the code that I used to generate the density maps. It is about 2.5 times slower than the <code> kde2d() </code> from the <code> MASS </code> package, but its behavior is more explicit, and it can (most importantly) be used to calculate weighted averages. There is also a function <code> kde2d.weighted</code> from the <code> ggtern </code> package, but it has a small bug in it and I haven't figured out how to get the results to interpret properly. The code below is about 3-4 times slower, but it works well. </p>
+
+<!--begin.rcode eval=FALSE  
+getMatrixElementsByLinearIndex <- function(mat, row_idx, col_idx){
+  nr = nrow(mat)
+  return(mat[row_idx + nr*(col_idx-1)])
+}
+
+## Function creates a kernel density grid, either based on density of points (default) 
+##          or a weighted density
+# variable - character of a variable that is used to weight the density
+# kernel_lat_sd - the standard deviation/bandwidth of the kernel in latitude units; default 
+#                 is approximately 1 mile
+# tile_latitude_size - the length of each tile's latitude dimension; longitude will scale 
+#                      with this to be roughly square
+# max_influence_sd - the maximum number of standard deviations in either axis that a point
+#                    can create influence
+# padding_lat - the amount of latitude added in each direction where the density will still
+#               be calculated; padding for longitude is calculated from this
+# normalize_weights - if TRUE, then the kernel density will be normalized over each affected 
+#                     region for each data point
+createWeightedGrid <- function(data, variable=NULL, kernel_lat_sd=1/69, tile_latitude_size=0.005,
+                               max_influence_sd = 2, padding_lat=0.005, normalize_weights=TRUE){
+  data = data[(!is.na(data$longitude)) & !is.na(data$latitude),]
+  if (!is.null(variable)){
+    data = data[!is.na(data[,variable]),]
+  }
+  longitude = data$longitude
+  latitude = data$latitude
+  med_lon = mean(range(longitude))
+  med_lat = mean(range(latitude))
+  lon_scale_factor = cos(med_lon * pi/180)
+  padding_lon = lon_scale_factor * padding_lat
+  range_lon = range(longitude, na.rm=TRUE) + c(-1, 1) * padding_lon
+  range_lat = range(latitude, na.rm=TRUE) + c(-1, 1) * padding_lat
+ 
+  
+  tile_longitude_size = tile_latitude_size * lon_scale_factor
+  padding_lon = lon_scale_factor * padding_lat
+  
+  lat_tile_values = seq(range_lat[1], range_lat[2], tile_latitude_size)
+  lon_tile_values = seq(range_lon[1], range_lon[2], tile_longitude_size)
+  
+  n_lat_tiles = length(lat_tile_values)
+  n_lon_tiles = length(lon_tile_values)
+  
+  weight_matrix = matrix(0, ncol=n_lon_tiles, nrow=n_lat_tiles)
+  
+  lat_to_index <- function(latitude){
+    round(n_lat_tiles * (latitude - range_lat[1])/diff(range_lat)) + 1
+  }
+  
+  lon_to_index <- function(longitude){
+    round(n_lon_tiles * (longitude - range_lon[1])/diff(range_lon))
+  }
+  
+  lat_index_radius = round(n_lat_tiles * max_influence_sd * tile_latitude_size/diff(range_lat))
+  lon_index_radius = round(n_lon_tiles * max_influence_sd * tile_longitude_size/diff(range_lon))
+  
+  calculate_latitude_bounds <- function(latitude){
+    lat_index = lat_to_index(latitude)
+    bounds = c(pmax(lat_index - lat_index_radius, 1), 
+               pmin(lat_index+lat_index_radius, n_lat_tiles))
+    return(bounds[1]:bounds[2])
+  }
+  
+  calculate_longitude_bounds <- function(longitude){
+    lon_index = lon_to_index(longitude)
+    bounds = c(pmax(lon_index - lon_index_radius, 1), 
+               pmin(lon_index+lon_index_radius, n_lon_tiles))
+    return(bounds[1]:bounds[2])
+  }
+  
+  if (!is.null(variable)){
+    x = data[,variable]
+  }
+  else{
+    x = rep(1, nrow(data))
+  }
+  
+  calculate_distance <- function(latitude, longitude, grid){
+    sqrt(((grid$longitude-longitude)*lon_scale_factor)^2 + 
+           (grid$latitude-latitude)^2)
+  }
+  for (i in 1:nrow(data)){
+    x_latitude = latitude[i]
+    x_longitude = longitude[i]
+    valid_lat_indexes = calculate_latitude_bounds(x_latitude)
+    valid_lon_indexes = calculate_longitude_bounds(x_longitude)
+    latlon_grid = expand.grid(lat_index = valid_lat_indexes, 
+                              lon_index = valid_lon_indexes)
+    latlon_grid$latitude = lat_tile_values[latlon_grid$lat_index]
+    latlon_grid$longitude = lon_tile_values[latlon_grid$lon_index]
+    
+    new_weights = 1/(pi*kernel_lat_sd) * exp(-((calculate_distance(x_latitude, 
+                                                     x_longitude,
+                                                     latlon_grid)))^2/
+                                               (2*kernel_lat_sd))
+    if (normalize_weights){
+      new_weights = new_weights/(sum(new_weights) + 1e-8)
+    }
+    weight_matrix[latlon_grid$lat_index + 
+                    n_lat_tiles * (latlon_grid$lon_index-1)] = 
+      weight_matrix[latlon_grid$lat_index + 
+                      n_lat_tiles * (latlon_grid$lon_index-1)] + 
+      new_weights * x[i]
+  }
+  final_grid = expand.grid(lat_index = 1:n_lat_tiles, lon_index=1:n_lon_tiles)
+  final_grid$longitude = lon_tile_values[final_grid$lon_index]
+  final_grid$latitude = lat_tile_values[final_grid$lat_index]
+  final_grid$weight = getMatrixElementsByLinearIndex(weight_matrix,
+                                                     final_grid$lat_index,
+                                                     final_grid$lon_index)
+  return(final_grid)
+}
+end.rcode-->
+
+</body>
+</html>
