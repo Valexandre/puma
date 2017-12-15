@@ -123,7 +123,7 @@ createWeightedGrid <- function(data, variable=NULL, kernel_lat_sd=1/69, tile_lat
   latitude = data$latitude
   med_lon = mean(range(longitude))
   med_lat = mean(range(latitude))
-  lon_scale_factor = cos(med_lon * pi/180)
+  lon_scale_factor = cos(med_lat * pi/180)
   padding_lon = lon_scale_factor * padding_lat
   range_lon = range(longitude, na.rm=TRUE) + c(-1, 1) * padding_lon
   range_lat = range(latitude, na.rm=TRUE) + c(-1, 1) * padding_lat

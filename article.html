@@ -96,8 +96,18 @@
 <p> Above I loaded some code I wrote to calculate density values for a map of new york. Below, I will use them as a rasterized overlay of a map using <code>geom_raster()</code>, which is much, much faster (~100 times) than using <code>geom_tile()</code> if it is possible to use it. Note that you must use <code>coord_cartesian()</code> after <code>ggmap()</code>, since rasterized graphics don't work with non-cartesian projections.</p>
 
 <div class="chunk" id="unnamed-chunk-2"><div class="rcode"><div class="source"><pre class="knitr r"><span class="hl std">default_density</span> <span class="hl kwb">=</span> <span class="hl kwd">createWeightedGrid</span><span class="hl std">(party_ready_realistic)</span>
-<span class="hl std">weighted_density</span> <span class="hl kwb">=</span> <span class="hl kwd">createWeightedGrid</span><span class="hl std">(party_ready_realistic,</span> <span class="hl kwc">variable</span><span class="hl std">=</span><span class="hl str">'duration'</span><span class="hl std">)</span>
-<span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">normalized</span> <span class="hl kwb">=</span> <span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">weight</span><span class="hl opt">/</span><span class="hl std">(</span><span class="hl num">1e-10</span> <span class="hl opt">+</span> <span class="hl std">default_density</span><span class="hl opt">$</span><span class="hl std">weight)</span>
+</pre></div>
+<div class="output"><pre class="knitr r">## [1] 0.7580717
+## [1] 0.003790359
+## [1] 0.005
+</pre></div>
+<div class="source"><pre class="knitr r"><span class="hl std">weighted_density</span> <span class="hl kwb">=</span> <span class="hl kwd">createWeightedGrid</span><span class="hl std">(party_ready_realistic,</span> <span class="hl kwc">variable</span><span class="hl std">=</span><span class="hl str">'duration'</span><span class="hl std">)</span>
+</pre></div>
+<div class="output"><pre class="knitr r">## [1] 0.7580717
+## [1] 0.003790359
+## [1] 0.005
+</pre></div>
+<div class="source"><pre class="knitr r"><span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">normalized</span> <span class="hl kwb">=</span> <span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">weight</span><span class="hl opt">/</span><span class="hl std">(</span><span class="hl num">1e-10</span> <span class="hl opt">+</span> <span class="hl std">default_density</span><span class="hl opt">$</span><span class="hl std">weight)</span>
 <span class="hl std">weighted_density</span><span class="hl opt">$</span><span class="hl std">default_density</span> <span class="hl kwb">=</span> <span class="hl std">default_density</span><span class="hl opt">$</span><span class="hl std">weight</span>
 </pre></div>
 </div></div>
@@ -120,44 +130,44 @@
   <tr>
    <td style="text-align:right;"> 1 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.49382 </td>
-   <td style="text-align:right;"> 0.0499707 </td>
+   <td style="text-align:right;"> 0.0499639 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 2 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.49882 </td>
-   <td style="text-align:right;"> 0.2462530 </td>
+   <td style="text-align:right;"> 0.3094801 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 3 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.50382 </td>
-   <td style="text-align:right;"> 3.6059958 </td>
+   <td style="text-align:right;"> 3.9012009 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 4 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.50882 </td>
-   <td style="text-align:right;"> 3.6156295 </td>
+   <td style="text-align:right;"> 3.9115544 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 5 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.51382 </td>
-   <td style="text-align:right;"> 3.5692839 </td>
+   <td style="text-align:right;"> 3.8654261 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 6 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.51882 </td>
-   <td style="text-align:right;"> 3.5667252 </td>
+   <td style="text-align:right;"> 3.8625678 </td>
   </tr>
 </tbody>
 </table><div class="source"><pre class="knitr r"><span class="hl kwd">cat</span><span class="hl std">(</span><span class="hl kwd">kable</span><span class="hl std">(</span><span class="hl kwd">head</span><span class="hl std">(weighted_density)))</span>
@@ -178,56 +188,56 @@
   <tr>
    <td style="text-align:right;"> 1 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.49382 </td>
-   <td style="text-align:right;"> 9.244575 </td>
+   <td style="text-align:right;"> 9.243324 </td>
    <td style="text-align:right;"> 185.0000 </td>
-   <td style="text-align:right;"> 0.0499707 </td>
+   <td style="text-align:right;"> 0.0499639 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 2 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.49882 </td>
-   <td style="text-align:right;"> 40.661230 </td>
-   <td style="text-align:right;"> 165.1198 </td>
-   <td style="text-align:right;"> 0.2462530 </td>
+   <td style="text-align:right;"> 53.871410 </td>
+   <td style="text-align:right;"> 174.0707 </td>
+   <td style="text-align:right;"> 0.3094801 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 3 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.50382 </td>
-   <td style="text-align:right;"> 383.735338 </td>
-   <td style="text-align:right;"> 106.4159 </td>
-   <td style="text-align:right;"> 3.6059958 </td>
+   <td style="text-align:right;"> 401.538563 </td>
+   <td style="text-align:right;"> 102.9269 </td>
+   <td style="text-align:right;"> 3.9012009 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 4 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.50882 </td>
-   <td style="text-align:right;"> 384.725184 </td>
-   <td style="text-align:right;"> 106.4061 </td>
-   <td style="text-align:right;"> 3.6156295 </td>
+   <td style="text-align:right;"> 402.550277 </td>
+   <td style="text-align:right;"> 102.9131 </td>
+   <td style="text-align:right;"> 3.9115544 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 5 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.51382 </td>
-   <td style="text-align:right;"> 375.847734 </td>
-   <td style="text-align:right;"> 105.3006 </td>
-   <td style="text-align:right;"> 3.5692839 </td>
+   <td style="text-align:right;"> 393.665244 </td>
+   <td style="text-align:right;"> 101.8427 </td>
+   <td style="text-align:right;"> 3.8654261 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 6 </td>
    <td style="text-align:right;"> 1 </td>
-   <td style="text-align:right;"> -74.25266 </td>
+   <td style="text-align:right;"> -74.25507 </td>
    <td style="text-align:right;"> 40.51882 </td>
-   <td style="text-align:right;"> 375.561314 </td>
-   <td style="text-align:right;"> 105.2958 </td>
-   <td style="text-align:right;"> 3.5667252 </td>
+   <td style="text-align:right;"> 393.339337 </td>
+   <td style="text-align:right;"> 101.8336 </td>
+   <td style="text-align:right;"> 3.8625678 </td>
   </tr>
 </tbody>
 </table>
@@ -257,7 +267,7 @@
   <span class="hl kwd">ggtitle</span><span class="hl std">(</span><span class="hl str">'Density of Noise Complaints in NYC (per year)'</span><span class="hl std">)</span> <span class="hl opt">+</span>
   <span class="hl kwd">guides</span><span class="hl std">(</span><span class="hl kwc">alpha</span><span class="hl std">=</span><span class="hl str">'none'</span><span class="hl std">)</span>
 </pre></div>
-<div class="warning"><pre class="knitr r">## Warning: Removed 2857 rows containing missing values (geom_raster).
+<div class="warning"><pre class="knitr r">## Warning: Removed 1243 rows containing missing values (geom_raster).
 </pre></div>
 </div><div class="rimage default"><img src="figure/unnamed-chunk-5-1.png" title="plot of chunk unnamed-chunk-5" alt="plot of chunk unnamed-chunk-5" class="plot" /></div></div>
 
@@ -274,7 +284,7 @@
   <span class="hl kwd">ggtitle</span><span class="hl std">(</span><span class="hl str">'Average Response Time to Noise Complaints in NYC'</span><span class="hl std">)</span> <span class="hl opt">+</span>
   <span class="hl kwd">guides</span><span class="hl std">(</span><span class="hl kwc">alpha</span><span class="hl std">=</span><span class="hl str">'none'</span><span class="hl std">)</span>
 </pre></div>
-<div class="warning"><pre class="knitr r">## Warning: Removed 2857 rows containing missing values (geom_raster).
+<div class="warning"><pre class="knitr r">## Warning: Removed 1243 rows containing missing values (geom_raster).
 </pre></div>
 </div><div class="rimage default"><img src="figure/unnamed-chunk-6-1.png" title="plot of chunk unnamed-chunk-6" alt="plot of chunk unnamed-chunk-6" class="plot" /></div></div>
 
@@ -310,7 +320,7 @@
   <span class="hl std">latitude</span> <span class="hl kwb">=</span> <span class="hl std">data</span><span class="hl opt">$</span><span class="hl std">latitude</span>
   <span class="hl std">med_lon</span> <span class="hl kwb">=</span> <span class="hl kwd">mean</span><span class="hl std">(</span><span class="hl kwd">range</span><span class="hl std">(longitude))</span>
   <span class="hl std">med_lat</span> <span class="hl kwb">=</span> <span class="hl kwd">mean</span><span class="hl std">(</span><span class="hl kwd">range</span><span class="hl std">(latitude))</span>
-  <span class="hl std">lon_scale_factor</span> <span class="hl kwb">=</span> <span class="hl kwd">cos</span><span class="hl std">(med_lon</span> <span class="hl opt">*</span> <span class="hl std">pi</span><span class="hl opt">/</span><span class="hl num">180</span><span class="hl std">)</span>
+  <span class="hl std">lon_scale_factor</span> <span class="hl kwb">=</span> <span class="hl kwd">cos</span><span class="hl std">(med_lat</span> <span class="hl opt">*</span> <span class="hl std">pi</span><span class="hl opt">/</span><span class="hl num">180</span><span class="hl std">)</span>
   <span class="hl std">padding_lon</span> <span class="hl kwb">=</span> <span class="hl std">lon_scale_factor</span> <span class="hl opt">*</span> <span class="hl std">padding_lat</span>
   <span class="hl std">range_lon</span> <span class="hl kwb">=</span> <span class="hl kwd">range</span><span class="hl std">(longitude,</span> <span class="hl kwc">na.rm</span><span class="hl std">=</span><span class="hl num">TRUE</span><span class="hl std">)</span> <span class="hl opt">+</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">,</span> <span class="hl num">1</span><span class="hl std">)</span> <span class="hl opt">*</span> <span class="hl std">padding_lon</span>
   <span class="hl std">range_lat</span> <span class="hl kwb">=</span> <span class="hl kwd">range</span><span class="hl std">(latitude,</span> <span class="hl kwc">na.rm</span><span class="hl std">=</span><span class="hl num">TRUE</span><span class="hl std">)</span> <span class="hl opt">+</span> <span class="hl kwd">c</span><span class="hl std">(</span><span class="hl opt">-</span><span class="hl num">1</span><span class="hl std">,</span> <span class="hl num">1</span><span class="hl std">)</span> <span class="hl opt">*</span> <span class="hl std">padding_lat</span>
